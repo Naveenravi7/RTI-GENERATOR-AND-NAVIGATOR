@@ -6,6 +6,27 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
+def extract_text(content):
+    """
+    Safely extracts string content from LangChain's response.content,
+    which can be a string or a list of blocks/parts (e.g. for Gemini models).
+    """
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict):
+                text_parts.append(block.get("text", block.get("thinking", "")))
+            elif isinstance(block, str):
+                text_parts.append(block)
+            elif hasattr(block, "get"):
+                text_parts.append(block.get("text", ""))
+            elif hasattr(block, "text"):
+                text_parts.append(block.text)
+            else:
+                text_parts.append(str(block))
+        return "".join(text_parts)
+    return str(content)
+
 def get_llm(provider, api_key, model_name=None):
     """
     Instantiates the selected LLM provider with the given API key.
@@ -88,7 +109,7 @@ Rules of engagement:
     
     try:
         response = llm.invoke(messages)
-        return response.content
+        return extract_text(response.content)
     except Exception as e:
         return f"An error occurred while calling the LLM API: {str(e)}"
 
@@ -135,7 +156,8 @@ Expected Output Format:
 
     try:
         response = llm.invoke([HumanMessage(content=prompt)])
-        content = response.content.strip()
+        response_text = extract_text(response.content)
+        content = response_text.strip()
         
         # Clean up JSON if LLM returned markdown code blocks
         if content.startswith("```json"):
@@ -147,11 +169,11 @@ Expected Output Format:
         if isinstance(queries, list):
             return {"queries": queries}
         else:
-            return {"error": "LLM did not return a valid list of queries.", "raw_response": response.content}
+            return {"error": "LLM did not return a valid list of queries.", "raw_response": response_text}
     except json.JSONDecodeError:
         # Fallback parsing in case JSON is malformed
         # Split by lines starting with numbers or bullet points
-        lines = response.content.split("\n")
+        lines = response_text.split("\n")
         queries = []
         for line in lines:
             line_cleaned = re.sub(r'^(\d+[\.\)]|\-\s*|\*\s*)', '', line.strip()).strip(' "\',')
@@ -159,6 +181,6 @@ Expected Output Format:
                 queries.append(line_cleaned)
         if queries:
             return {"queries": queries}
-        return {"error": "Failed to parse LLM response as JSON list.", "raw_response": response.content}
+        return {"error": "Failed to parse LLM response as JSON list.", "raw_response": response_text}
     except Exception as e:
         return {"error": f"Error during query optimization: {str(e)}"}
