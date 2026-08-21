@@ -485,3 +485,5 @@ with tab3:
     - The department has **30 days** to reply from the date they receive your application.
     - If you receive no reply, or a partial/misleading reply, you have **30 days** from the expiry of the deadline to file a **First Appeal** with the First Appellate Authority (FAA) of the same department.
     """)
+
+# Trigger Streamlit hot reload of utility modules
